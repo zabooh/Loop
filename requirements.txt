@@ -1,0 +1,5 @@
+# Python packages used by the Loop tooling
+pyserial>=3.5         # serial console + setup_flasher port detection
+numpy                 # sweep maths
+matplotlib            # sweep plots (freq_sweep.py / duty_sweep.py)
+logic2-automation     # Saleae Logic 2 automation API (smoketest / sweeps)

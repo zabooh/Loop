@@ -161,8 +161,20 @@ detected automatically).
 
 ### First-time setup (after cloning)
 
-Two Python helpers adapt a fresh clone to your machine (both support `--auto` to
-run unattended):
+Run the one-shot installer — it installs the Python packages, checks the external
+toolchain (XC8 / CMake / Ninja / MPLAB MDB) and runs the per-machine setup:
+
+```
+install.bat                 :: or: python install.py
+install.bat --no-setup      :: only install packages + check the toolchain
+```
+
+It pip-installs `requirements.txt` (`pyserial`, `numpy`, `matplotlib`,
+`logic2-automation`), reports any missing external tool with a hint, and then
+runs the two setup helpers below. After it prints **Toolchain: OK** you are ready
+to `build.bat` / `flash.py` / `run_ci.py`.
+
+The two helpers it runs (also usable on their own; both support `--auto`):
 
 ```
 python setup_compiler.py    :: choose the installed XC8 version, patch toolchain.cmake
@@ -336,6 +348,8 @@ are present in the folder.
 | Path                    | Purpose                                                                                                                             |
 |-------------------------|-------------------------------------------------------------------------------------------------------------------------------------|
 | main.c                  | Application: UART console, command parser and hardware PWM control                                                                  |
+| install.bat / install.py| One-shot installer: pip deps + toolchain check + per-machine setup                                                                  |
+| requirements.txt        | Python package list (pyserial, numpy, matplotlib, logic2-automation)                                                               |
 | setup_compiler.py       | Pick the XC8 version and patch `toolchain.cmake` (writes `setup_compiler.config`)                                                   |
 | setup_flasher.py        | Detect the Curiosity Nano COM port (writes `setup_flasher.config`)                                                                  |
 | project_config.py       | Reads `setup_flasher.config` for the tools' default `--port`                                                                        |
