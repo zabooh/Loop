@@ -14,3 +14,16 @@ __pycache__/
 # --- Logs / scratch ---
 /queuelogs/
 _*.txt
+
+.generated_files/
+build/
+dist/
+nbproject/
+Makefile*
+Package-*
+private/
+_build/
+!cmake/**/user.cmake
+cmake/**/.generated/*
+cmake/**/CMake*
+out/
