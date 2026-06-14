@@ -345,13 +345,19 @@ curves per frequency to show this.
 python duty_sweep.py                          :: default 1/10/50 kHz, show plot
 python duty_sweep.py --freqs 1000,20000,100000
 python duty_sweep.py --duty-step 2            :: finer duty sweep
-python duty_sweep.py --sample-rate 25000000   :: resolve finer steps at high f
+python duty_sweep.py --sample-rate 50000000   :: force a fixed rate instead of auto
 ```
+
+The Saleae's duty resolution is one sample per period (`frequency / sample_rate`),
+so `--sample-rate` defaults to **auto**: per frequency it picks the smallest valid
+rate giving ≥ 2000 samples/period, capped at the Logic 8 maximum of **100 MS/s**.
+That keeps the resolution around **0.05 pp** even at 50 kHz (where a fixed 10 MS/s
+would only resolve ~0.5 pp and round the firmware's 0.156 pp steps away). Pass a
+fixed value to override.
 
 It writes `duty_sweep.csv` and `duty_sweep.png` (requested-vs-measured and the
 deviation in percentage points, with Saleae-measured dots and the firmware's
-quantisation as `x`). Note: at 10 MS/s the Saleae resolves ~0.5 pp at 50 kHz, so
-the firmware's sub-step quantisation there is only visible at a higher sample rate.
+quantisation as `x`).
 
 ![Duty-cycle sweep at 1/10/50 kHz: requested vs. measured duty and the deviation in percentage points](duty_sweep.png)
 

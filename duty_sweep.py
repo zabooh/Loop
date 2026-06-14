@@ -37,6 +37,20 @@ import project_config
 
 RC0_CH = 0                       # Saleae digital channel wired to RC0 (PWM1)
 
+# Valid Logic 8 digital sample rates (probed: 100 MS/s is the max it accepts).
+VALID_RATES = (10_000_000, 25_000_000, 50_000_000, 100_000_000)
+TARGET_SPP = 2000                # aim for >=2000 samples/period (~0.05 pp duty)
+
+
+def choose_sample_rate(freq, target_spp=TARGET_SPP):
+    """Smallest valid rate giving >= target_spp samples/period (capped at max).
+    The Saleae duty resolution is one sample per period (= freq / sample_rate),
+    so this guarantees a fine enough time resolution per frequency."""
+    for r in VALID_RATES:
+        if r / freq >= target_spp:
+            return r
+    return VALID_RATES[-1]
+
 
 def duty_points(step):
     """Requested duty values 0..100 plus a few near the ends."""
@@ -50,8 +64,10 @@ def run_sweep(args):
 
     freqs = [int(x) for x in args.freqs.split(",") if x.strip()]
     duties = duty_points(args.duty_step)
+    rate_str = "auto (per frequency)" if not args.sample_rate \
+        else f"{args.sample_rate/1e6:.1f} MS/s"
     print(f"Duty sweep at {freqs} Hz, {len(duties)} duty points each, "
-          f"Saleae @ {args.sample_rate/1e6:.1f} MS/s on {args.port}")
+          f"Saleae @ {rate_str} on {args.port}")
 
     console = Console(args.port, echo=False)        # open serial first (fail fast)
     console.cmd("pulse a on")
@@ -74,8 +90,10 @@ def run_sweep(args):
         for f in freqs:
             console.cmd(f"pulse freq {f}")
             duration = max(0.02, 60.0 / f)
-            spp = args.sample_rate / f
-            print(f"\n  f = {f} Hz  ({spp:.0f} samples/period)"
+            sr = args.sample_rate or choose_sample_rate(f)   # 0 => auto per freq
+            spp = sr / f
+            print(f"\n  f = {f} Hz  @ {sr/1e6:.0f} MS/s ({spp:.0f} samples/period,"
+                  f" ~{100.0/spp:.3f} pp duty resolution)"
                   f"{'  COARSE' if spp < 100 else ''}")
             for d in duties:
                 resp = console.cmd(f"pulse a duty {d}")
@@ -83,7 +101,7 @@ def run_sweep(args):
                 fw = float(m.group(1)) if m else float("nan")
 
                 csv_path = capture_freq(manager, device_id, RC0_CH,
-                                        args.sample_rate, duration, capdir)
+                                        sr, duration, capdir)
                 meas = analyze_digital_csv(csv_path, RC0_CH)["duty_pct"]
                 dev = meas - d
                 rows.append((f, d, fw, meas, dev))
@@ -158,8 +176,9 @@ def main():
     ap.add_argument("--freqs", default="1000,10000,50000",
                     help="comma-separated frequencies in Hz")
     ap.add_argument("--duty-step", type=int, default=5, help="duty sweep step in %%")
-    ap.add_argument("--sample-rate", type=int, default=10_000_000,
-                    help="Saleae digital sample rate in S/s (default 10 MS/s)")
+    ap.add_argument("--sample-rate", type=int, default=0,
+                    help="Saleae digital sample rate in S/s; 0 = auto per frequency "
+                         "(>=2000 samples/period, capped at 100 MS/s)")
     ap.add_argument("--device-id", default=None, help="Saleae device id (default: first found)")
     ap.add_argument("--automation-port", type=int, default=10430)
     ap.add_argument("--csv", default=os.path.join(here, "duty_sweep.csv"))
