@@ -1,0 +1,206 @@
+title: Automated Build / Flash / Test — PIC16F13145 PWM project
+
+slides:
+  - type: title_slide
+    title: Automated Build, Flash & Test
+    subtitle: A CLI- and logic-analyzer-driven workflow on the PIC16F13145 Curiosity Nano
+    author: Martin Ruppert | Microchip
+    date: "2026-06-14"
+
+  - type: bullets
+    title: What We Built
+    items:
+      - { text: "Firmware — a UART console controlling two hardware PWM channels", level: 0 }
+      - { text: "PIC16F13145 Curiosity Nano, PWM1->RC0, PWM2->RC1 (Timer2)", level: 1 }
+      - { text: "Commands: help / version / reset / pulse freq|duty|on|off|status", level: 1 }
+      - { text: "Line editor with cursor, mid-line edit and 10-command history", level: 1 }
+      - { text: "Build-timestamp banner identifies the running firmware", level: 1 }
+      - { text: "Tooling — the whole loop runs from the command line", level: 0 }
+      - { text: "build.bat (CMake+Ninja+XC8), flash.py (MPLAB MDB)", level: 1 }
+      - { text: "smoketest.py, freq_sweep.py, duty_sweep.py (Saleae-verified)", level: 1 }
+
+  - type: two_column
+    title: Manual vs. Automated
+    intro: The same edit-build-flash-measure loop, by hand versus one command.
+    left_title: Manual (IDE + scope by eye)
+    left_items:
+      - { text: "Click Build, click Program in the IDE", level: 0 }
+      - { text: "Open a terminal, type commands by hand", level: 0 }
+      - { text: "Read a scope, eyeball frequency and duty", level: 0 }
+      - { text: "Slow, subjective, not repeatable, no record", level: 0 }
+    right_title: Automated (CLI + logic analyzer)
+    right_items:
+      - { text: "build.bat -> flash.py -> smoketest.py", level: 0 }
+      - { text: "Host scripts drive the console over USB CDC", level: 0 }
+      - { text: "Saleae measures the real pins; pass/fail in code", level: 0 }
+      - { text: "Fast, objective, reproducible, CSV + plots archived", level: 0 }
+    outcome: One scripted pipeline replaces a dozen manual clicks and a pair of eyes.
+
+  - type: pipeline
+    title: The Automated Pipeline
+    steps:
+      - title: "1. Build"
+        description: build.bat drives the CMake preset + Ninja with the XC8 toolchain.
+      - title: "2. Flash"
+        description: flash.py drives the MPLAB MDB to program the HEX over ICSP.
+      - title: "3. Run"
+        description: The target boots and exposes its CLI over the virtual COM port.
+      - title: "4. Verify"
+        description: Host scripts set PWM via the CLI and measure it with the Saleae.
+    outcome: Edit a line of C and one command later you have a pass/fail with plots.
+
+  - type: code_slide
+    title: 1. Build from the CLI — build.bat
+    language: text
+    code: |
+      build.bat            :: configure (if needed) + build
+      build.bat rebuild    :: clean, then build
+      build.bat clean      :: remove build tree + output
+
+      === Build finished ===
+      Output: out\Loop\default.elf  (+ default.hex)
+      Program space  76.0%   Data space  75.7%
+    notes:
+      - { text: "Wraps the generated CMake preset and Ninja — no IDE needed.", level: 0 }
+      - { text: "XC8 is referenced by absolute path, so it need not be on PATH.", level: 0 }
+      - { text: "Returns a non-zero exit code on failure — CI-friendly.", level: 0 }
+
+  - type: code_slide
+    title: 2. Flash from the CLI — flash.py (MPLAB MDB)
+    language: text
+    code: |
+      python flash.py          # program out\Loop\default.hex, then run
+      python flash.py --list   # list detected debuggers
+
+      [LOOP] MDB << program "out\Loop\default.hex"
+      [LOOP] MDB >> Program succeeded.
+      [LOOP] SUCCESS: Device programmed; target running.
+    notes:
+      - { text: "Drives mdb.bat (Microchip Debugger Backend) as a subprocess.", level: 0 }
+      - { text: "Auto-selects the on-board pkobnano debugger and programs over ICSP.", level: 0 }
+      - { text: "Releases the target so it runs immediately — no IDE in the loop.", level: 0 }
+
+  - type: block_diagram
+    title: Hardware-in-the-Loop Test Setup
+    blocks:
+      - { title: "PIC16F13145\nRC0 / RC1 PWM" }
+      - { title: "Saleae Logic 8\nch0 / ch1" }
+      - { title: "Logic 2\nautomation API" }
+      - { title: "digital.csv\nraw export" }
+      - { title: "Python\nedge analysis" }
+      - { title: "PASS / FAIL\n+ plot" }
+    notes:
+      - { text: "Measurement path: the PWM pins are sampled directly by the analyzer.", level: 0 }
+      - { text: "Control path: commands go to the CLI over USB CDC (COM12).", level: 0 }
+      - { text: "One host process orchestrates both the serial console and the capture.", level: 0 }
+
+  - type: code_slide
+    title: The CLI Under Test
+    language: text
+    code: |
+      > version
+      Loop firmware | build Jun 14 2026 00:13:01
+      > pulse freq 9600
+      Frequency -> 9615.384 Hz (requested 9600)
+      > pulse a duty 33.3
+      Duty A -> 33.293 % (requested 33.3)
+      > pulse a on
+      Signal A -> ON
+      > pulse status
+      Frequency = 9615.384 Hz (shared)
+      A (RC0): ON, duty 33.293 %
+    notes:
+      - { text: "Floating-point input; the device echoes the quantised actual value.", level: 0 }
+      - { text: "Scripts parse these replies as the expected reference for each test.", level: 0 }
+
+  - type: code_slide
+    title: 3. Verify — smoketest.py drives CLI + Saleae
+    language: python
+    code: |
+      console.cmd(f"pulse freq {f}")      # set via the CLI
+      console.cmd(f"pulse a duty {da}")
+      console.cmd("pulse a on")
+
+      cap = manager.start_capture(...)    # Saleae timed capture
+      cap.export_raw_data_csv(out_dir)    # -> digital.csv
+
+      m = analyze_digital_csv("digital.csv", ch=0)
+      assert abs(m.freq - f) < f * 0.03   # 3% (HFINTOSC)
+      assert abs(m.duty - da) < 2.0       # 2 percentage points
+    notes:
+      - { text: "Frequency from the median of rising-edge intervals.", level: 0 }
+      - { text: "Duty from high-time / period; a disabled channel must read low.", level: 0 }
+
+  - type: metrics
+    title: Smoke-Test Results
+    metrics:
+      - { label: "Test cases", value: "4/4 PASS", tone: ok }
+      - { label: "Freq deviation", value: "< 0.5 %", tone: ok }
+      - { label: "Duty deviation", value: "< 0.05 pp", tone: ok }
+      - { label: Verdict, value: PASS, tone: ok }
+    notes:
+      - { text: "Cases: 1 kHz, 5 kHz, 20 kHz at various duties + one disabled channel.", level: 0 }
+      - { text: "Measured duty matched the firmware's quantised values exactly.", level: 0 }
+      - { text: "Frequency offset is the internal HFINTOSC (+/-2%), well inside tolerance.", level: 0 }
+
+  - type: image_slide
+    title: Frequency Sweep — Saleae-Verified
+    image_path: freq_sweep.png
+    caption:
+      - { text: "Every requested frequency is set, captured and measured on RC0.", level: 0 }
+      - { text: "Top: requested vs. measured (on the ideal line). Bottom: deviation.", level: 0 }
+      - { text: "Deviation = quantisation of the integer Timer2 divider (< 0.5%).", level: 0 }
+
+  - type: image_slide
+    title: Duty-Cycle Sweep across Frequencies
+    image_path: duty_sweep.png
+    caption:
+      - { text: "Duty 0..100% swept at 1 / 10 / 50 kHz, each point Saleae-measured.", level: 0 }
+      - { text: "Resolution (4*N steps) gets coarser as the frequency rises.", level: 0 }
+      - { text: "Dots = measured, x = firmware-reported quantisation.", level: 0 }
+
+  - type: two_column
+    title: Interpreting the Results — Quantisation vs. the Real World
+    intro: Two deviations per point — firmware vs. requested = quantisation; measured vs. firmware = oscillator + measurement.
+    left_title: Frequency
+    left_items:
+      - { text: "Firmware vs. requested = integer-divider quantisation (15321 -> 15267 Hz)", level: 0 }
+      - { text: "Measured vs. firmware = a consistent -0.1...-0.15 %", level: 0 }
+      - { text: "That offset is the HFINTOSC running slightly slow (inside its +/-2 % spec)", level: 1 }
+      - { text: "Saleae is accurate here: per-edge +/-100 ns averages over many cycles", level: 0 }
+      - { text: "It only limits above ~100-200 kHz, as samples/period approach the rate", level: 0 }
+    right_title: Duty cycle
+    right_items:
+      - { text: "Firmware quantises to 4N steps — at 50 kHz that is 0.156 pp/step", level: 0 }
+      - { text: "Saleae duty resolution = frequency / sample_rate (one sample per period)", level: 0 }
+      - { text: "50 kHz @ 10 MS/s -> 0.5 pp, coarser than the firmware's step", level: 1 }
+      - { text: "So measured != firmware at 1 % / 99 % is a measurement limit, not a fault", level: 0 }
+      - { text: "Fix: raise --sample-rate to 25-50 MS/s -> >=1000 samples/period again", level: 0 }
+    left_tone: accent
+    right_tone: warn
+    outcome: The only real analogue error is the HFINTOSC (~-0.1 %); the Saleae is the bottleneck only for duty at high frequency.
+
+  - type: block_diagram
+    title: run_ci.py — One Command, One HTML Protocol
+    blocks:
+      - { title: "build.bat\nXC8" }
+      - { title: "flash.py\nMDB / ICSP" }
+      - { title: "regression.py\nserial" }
+      - { title: "smoketest.py\nSaleae" }
+      - { title: "report.html\nPASS / FAIL" }
+    notes:
+      - { text: "Serial regression (no instrument): input validation, line editor, RX-stress, reset.", level: 0 }
+      - { text: "Saleae smoke: frequency + duty on the pins, plus duty-held-across-frequency.", level: 0 }
+      - { text: "One self-contained report.html: overall verdict, every check, build memory, firmware stamp.", level: 0 }
+      - { text: "Non-zero exit code on any failure -> drops straight into a CI job.", level: 0 }
+      - { text: "The regression suite already caught a real bug (pulse freq overflow accepted 9 MHz).", level: 0 }
+
+  - type: bullets
+    title: Takeaways
+    items:
+      - { text: "The full edit -> build -> flash -> verify loop is one scripted pipeline", level: 0 }
+      - { text: "A serial CLI makes the firmware controllable and observable from a host", level: 0 }
+      - { text: "A logic analyzer turns 'looks right' into a measured pass/fail", level: 0 }
+      - { text: "Logic 2 automation + CSV export = repeatable, archivable evidence", level: 0 }
+      - { text: "Everything is CI-ready: exit codes, CSV data and plots per run", level: 0 }
+      - { text: "Same pattern scales to any peripheral with an observable output", level: 0 }

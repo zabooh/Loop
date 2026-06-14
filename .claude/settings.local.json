@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__mchp-docs__search_datasheet",
+      "mcp__mchp-docs__get_example_projects",
+      "mcp__mchp-docs__get_evaluation_boards",
+      "mcp__mchp-docs__search_evk_user_guide"
+    ]
+  }
+}
