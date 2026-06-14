@@ -33,6 +33,11 @@ duty cycle. The project can be built and flashed entirely from the command line
 
 ## Hardware / pin map
 
+![PIC16F13145 Curiosity Nano pinout](docs/pic16f13145-cnano-pinout.png)
+
+*PIC16F13145 Curiosity Nano pinout (Microchip board design files). This project
+drives the UART console on RC4/RC5 and the two PWM outputs on RC0/RC1.*
+
 | Signal            | PIC pin | Notes                                                          |
 |-------------------|---------|----------------------------------------------------------------|
 | EUSART1 **TX**    | RC4     | target TX → debugger CDC RX (virtual COM port)                 |
@@ -397,6 +402,7 @@ are present in the folder.
 | run_ci.py               | One-command CI: build → flash → regression + smoke → `report.html`                                                                  |
 | testreport.py           | Shared result model + self-contained HTML report writer                                                                            |
 | report.html             | Generated CI protocol (overall verdict + every check); `regression_report.html` likewise                                           |
+| docs                    | Reference images (e.g. the Curiosity Nano pinout shown above)                                                                       |
 | smoketest_csv           | Raw `digital.csv` captures from the last smoke-test run (re-analysable)                                                             |
 | _build                  | The [CMake build tree](https://cmake.org/cmake/help/latest/manual/cmake.1.html#introduction-to-cmake-buildsystems), can be deleted. |
 | cmake                   | Generated [CMake](https://cmake.org/) files. May be deleted if user.cmake has not been added                                        |
