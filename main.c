@@ -207,6 +207,71 @@ static void PWM_Init(void)
     RC1PPS = 0x2D;                      // RC1 <- PWM2
 }
 
+// ============== CLB half-bridge (RC0 = HS, RC1 = LS) =================
+// Drives the CLB-synthesized half-bridge (clb/clb_halfbridge.v) with a runtime
+// dead-time. The bitstream (clbBitstream.S) is streamed into the CLB by the NVM
+// scanner; the dead-time is written live through CLBSWIN. While active, RC0/RC1
+// are switched from the PWM modules to the CLB outputs, and PWM1 is the input
+// waveform (set its frequency/duty with the normal `pulse freq` / `pulse a duty`).
+//
+// [SYNTH] constants must be matched to the synthesized design once
+// clb_halfbridge.v has been run through the CLB Synthesizer (output PPS codes,
+// the CLBSWIN bits carrying dt, and the BLE clock). Placeholders until then.
+extern uint16_t start_clb_config;          // symbols from clbBitstream.S
+extern uint16_t end_clb_config;
+
+#define CLB_CLK_SEL   0x01                 // [SYNTH] CLBCLK source (BLE_clk)
+#define CLBPPSOUT_HS  0x24                 // [SYNTH] CLBPPSOUT0 -> RC0 (high-side)
+#define CLBPPSOUT_LS  0x25                 // [SYNTH] CLBPPSOUT1 -> RC1 (low-side)
+
+static uint8_t g_clb_on = 0;
+static uint8_t g_clb_dt = 3;               // dead-time in BLE_clk cycles (0..15)
+
+// Stream the bitstream from program memory into the CLB via the NVM scanner.
+static void CLB_Load(void)
+{
+    uint16_t start = (uint16_t)&start_clb_config;
+    uint16_t end   = (uint16_t)&end_clb_config;
+
+    CLBCONbits.EN = 0;                      // CLB off during load
+    SCANHADRH = (uint8_t)(end >> 8);   SCANHADRL = (uint8_t)end;
+    SCANLADRH = (uint8_t)(start >> 8); SCANLADRL = (uint8_t)start;
+
+    SCANCON0bits.EN  = 1;
+    SCANDPSbits.DPS  = 1;                   // route scanner data -> CLB
+    SCANCON0bits.SGO = 1;                   // start the load
+    while (SCANCON0bits.BUSY) { }
+    SCANDPSbits.DPS  = 0;
+    SCANCON0bits.SGO = 0;
+    SCANCON0bits.EN  = 0;
+}
+
+// Dead-time in BLE_clk cycles, written live via CLBSWIN (no re-synthesis).
+static void CLB_SetDeadtime(uint8_t dt)
+{
+    g_clb_dt = dt & 0x0F;
+    while (CLBCONbits.BUSY) { }             // wait for CLBSWIN to sync
+    CLBSWINL = g_clb_dt;                    // [SYNTH] dt carried in CLBSWIN[3:0]
+}
+
+static void CLB_SetEnabled(uint8_t on)
+{
+    if (on) {
+        CLBCLK = CLB_CLK_SEL;
+        CLB_Load();
+        CLBSWINL = g_clb_dt;
+        CLBCONbits.EN  = 1;                 // run the CLB
+        PWM1CONbits.EN = 1;                 // PWM1 = half-bridge input waveform
+        RC0PPS = CLBPPSOUT_HS;              // RC0 <- CLB high-side
+        RC1PPS = CLBPPSOUT_LS;              // RC1 <- CLB low-side
+    } else {
+        CLBCONbits.EN = 0;
+        RC0PPS = 0x2C;                      // RC0 -> PWM1 again
+        RC1PPS = 0x2D;                      // RC1 -> PWM2 again
+    }
+    g_clb_on = on;
+}
+
 // ============================= UART I/O ==============================
 static void UART1_Write(uint8_t b)
 {
@@ -245,6 +310,9 @@ static void cmd_help(void)
     printf("  pulse a|b on|off      - enable/disable channel (RC0/RC1)\r\n");
     printf("  pulse a|b duty <0-100>- set channel duty cycle (percent, e.g. 33.3)\r\n");
     printf("  pulse status          - show current state\r\n");
+    printf("  clb on|off            - CLB half-bridge on RC0(HS)/RC1(LS)\r\n");
+    printf("  clb dt <0-15>         - dead-time in BLE_clk cycles (live)\r\n");
+    printf("  clb status            - show CLB state\r\n");
     printf("\r\nPWM: both channels share one frequency (Timer2 base).\r\n");
     printf("     Full 10-bit duty up to 31.25 kHz, coarser above.\r\n");
 }
@@ -304,6 +372,27 @@ static void cmd_pulse(char *a1, char *a2, char *a3)
     printf("Error: pulse freq <Hz> | a|b on|off | a|b duty <0-100> | status\r\n");
 }
 
+static void cmd_clb(char *a1, char *a2)
+{
+    if (a1 && strcmp(a1, "on") == 0) {
+        CLB_SetEnabled(1);
+        printf("CLB half-bridge -> ON (RC0=HS, RC1=LS; PWM1 = input)\r\n");
+    } else if (a1 && strcmp(a1, "off") == 0) {
+        CLB_SetEnabled(0);
+        printf("CLB half-bridge -> OFF (RC0/RC1 back to PWM)\r\n");
+    } else if (a1 && a2 && strcmp(a1, "dt") == 0) {
+        uint32_t v;
+        if (!parse_u32(a2, &v)) { printf("Error: invalid number '%s'\r\n", a2); return; }
+        if (v > 15) v = 15;
+        CLB_SetDeadtime((uint8_t)v);
+        printf("Dead-time -> %u cycles\r\n", (unsigned)v);
+    } else if (a1 && strcmp(a1, "status") == 0) {
+        printf("CLB: %s, dead-time %u cycles\r\n", g_clb_on ? "ON" : "OFF", (unsigned)g_clb_dt);
+    } else {
+        printf("Error: clb on|off | dt <0-15> | status\r\n");
+    }
+}
+
 // =========================== Line parser =============================
 static void process_line(char *line)
 {
@@ -322,6 +411,10 @@ static void process_line(char *line)
         char *a2 = strtok(NULL, " ");
         char *a3 = strtok(NULL, " ");
         cmd_pulse(a1, a2, a3);
+    } else if (strcmp(cmd, "clb") == 0) {
+        char *a1 = strtok(NULL, " ");
+        char *a2 = strtok(NULL, " ");
+        cmd_clb(a1, a2);
     } else {
         printf("Unknown command: '%s'  (type 'help')\r\n", cmd);
     }

@@ -7,7 +7,7 @@ foreach(source_file ${Loop_default_default_XC8_FILE_TYPE_assemble})
         set_source_files_properties(${source_file} PROPERTIES INCLUDE_DIRECTORIES "$<PATH:NORMAL_PATH,$<PATH:REMOVE_FILENAME,${source_file}>>")
 endforeach()
 
-set(Loop_default_default_XC8_FILE_TYPE_assemblePreprocess)
+set(Loop_default_default_XC8_FILE_TYPE_assemblePreprocess "${CMAKE_CURRENT_SOURCE_DIR}/../../../clbBitstream.S")
 set_source_files_properties(${Loop_default_default_XC8_FILE_TYPE_assemblePreprocess} PROPERTIES LANGUAGE ASM)
 
 # For assembly files, add "." to the include path for each file so that .include with a relative path works
