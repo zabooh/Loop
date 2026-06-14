@@ -13,11 +13,13 @@ duty cycle. The project can be built and flashed entirely from the command line
 ## Contents
 
 - [Hardware / pin map](#hardware--pin-map)
+- [Installation](#installation)
+  - [System prerequisites](#system-prerequisites)
+  - [Configure with the install script](#configure-with-the-install-script)
 - [Serial console commands](#serial-console-commands)
   - [How the PWM is generated](#how-the-pwm-is-generated)
   - [Achievable frequencies](#achievable-frequencies)
 - [Build, flash and run](#build-flash-and-run)
-  - [First-time setup (after cloning)](#first-time-setup-after-cloning)
   - [In VS Code](#in-vs-code)
   - [From the command line](#from-the-command-line)
   - [Watching the console](#watching-the-console)
@@ -44,6 +46,63 @@ duty cycle. The project can be built and flashed entirely from the command line
 
 > RC4/RC5 are reserved for the UART. The PWM outputs therefore use RC0/RC1 —
 > verify these pins are free on the Curiosity Nano header before wiring to them.
+
+## Installation
+
+### System prerequisites
+
+Install these **before** cloning. The install script *checks* for them but does
+not install them — only the Python packages are installed automatically.
+
+| Requirement | Used for | Notes (tested version / location) |
+|-------------|----------|-----------------------------------|
+| Windows 10/11 | the tooling assumes Windows paths | — |
+| Git | cloning the repository | — |
+| Python 3.9+ and `pip` | every `.py` tool and the installer | Python 3.14 tested |
+| MPLAB XC8 compiler | building the firmware | `C:\Program Files\Microchip\xc8\` (v3.10) |
+| MPLAB X IDE | provides `mdb.bat` for flashing **and** the PIC16F1xxxx DFP | `C:\Program Files\Microchip\MPLABX\` (v6.25) |
+| CMake ≥ 3.24 | build system | on `PATH` or `C:\Program Files\CMake\bin` |
+| Ninja | build generator | on `PATH` |
+
+Optional, depending on what you do:
+
+- **MPLAB extension for VS Code** — to build/flash from the IDE (Ctrl+Shift+B).
+- **Saleae Logic 2 + a logic analyzer** — only for the hardware tests
+  (`smoketest.py`, `freq_sweep.py`, `duty_sweep.py`, `run_ci.py`). Enable the
+  automation server (Preferences → Automation, port 10430) and wire ch0 → RC0,
+  ch1 → RC1.
+- **PIC16F13145 Curiosity Nano (EV06M52A)** connected via USB — the target board.
+
+### Configure with the install script
+
+```cmd
+git clone C:\work\Loop Loop_Check
+cd Loop_Check
+install.bat
+```
+
+`install.bat` (a thin wrapper over `install.py`) does four things:
+
+1. `pip install -r requirements.txt` — `pyserial`, `numpy`, `matplotlib`,
+   `logic2-automation`.
+2. verifies those imports.
+3. checks the prerequisites above and prints `[MISS]` + a hint for anything
+   absent (it cannot install XC8 / MPLAB X / CMake / Ninja for you).
+4. runs `setup_compiler.py --auto` (patch `cmake/.../toolchain.cmake` to the
+   local XC8) and `setup_flasher.py --auto` (store the Curiosity Nano COM port in
+   `setup_flasher.config`, which the test tools use as their default `--port`).
+
+When it prints **Python packages: OK** and **Toolchain: OK**, you are ready:
+
+```cmd
+build.bat
+python flash.py
+python run_ci.py
+```
+
+`install.bat --no-setup` installs the packages and checks the toolchain only
+(skips the per-machine setup). The two helpers can also be run on their own —
+`python setup_compiler.py` and `python setup_flasher.py` (both support `--auto`).
 
 ## Serial console commands
 
@@ -159,38 +218,8 @@ Notes:
 Connect the Curiosity Nano via USB first (the on-board PKOB nano debugger is
 detected automatically).
 
-### First-time setup (after cloning)
-
-Run the one-shot installer — it installs the Python packages, checks the external
-toolchain (XC8 / CMake / Ninja / MPLAB MDB) and runs the per-machine setup:
-
-```
-install.bat                 :: or: python install.py
-install.bat --no-setup      :: only install packages + check the toolchain
-```
-
-It pip-installs `requirements.txt` (`pyserial`, `numpy`, `matplotlib`,
-`logic2-automation`), reports any missing external tool with a hint, and then
-runs the two setup helpers below. After it prints **Toolchain: OK** you are ready
-to `build.bat` / `flash.py` / `run_ci.py`.
-
-The two helpers it runs (also usable on their own; both support `--auto`):
-
-```
-python setup_compiler.py    :: choose the installed XC8 version, patch toolchain.cmake
-python setup_flasher.py     :: detect the Curiosity Nano, store its COM port
-```
-
-- `setup_compiler.py` scans `C:\Program Files\Microchip\xc8\`, lets you pick a
-  version and patches `cmake/Loop/default/.generated/toolchain.cmake` so
-  `build.bat` uses it — run it if your XC8 version/location differs from the one
-  baked into the committed `toolchain.cmake`. Saves `setup_compiler.config`.
-- `setup_flasher.py` finds the board's *Curiosity Virtual COM Port* and writes
-  `setup_flasher.config`; the Python tools (`smoketest.py`, `regression.py`,
-  `run_ci.py`, …) then default their `--port` to it (fallback `COM12`). Flashing
-  itself auto-detects the on-board `pkobnano` debugger.
-
-After that, `build.bat` / `flash.py` / `run_ci.py` work with no extra arguments.
+> Fresh clone? See [Installation](#installation) first — `install.bat` installs
+> the Python packages, checks the toolchain and runs the per-machine setup.
 
 ### In VS Code
 
