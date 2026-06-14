@@ -26,6 +26,7 @@ import time
 
 from smoketest import Console
 from testreport import Suite, Result, Check, write_html
+import project_config
 
 ESC, LB = 0x1B, 0x5B
 K_UP, K_DOWN = [ESC, LB, 0x41], [ESC, LB, 0x42]
@@ -183,7 +184,7 @@ def run(console) -> Suite:
 def main():
     here = os.path.dirname(os.path.abspath(__file__))
     ap = argparse.ArgumentParser(description="Serial-only firmware regression tests")
-    ap.add_argument("--port", default="COM12")
+    ap.add_argument("--port", default=project_config.flasher_port())
     ap.add_argument("--out", default=os.path.join(here, "regression_report.html"))
     args = ap.parse_args()
 

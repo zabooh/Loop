@@ -39,6 +39,7 @@ import sys
 import time
 
 from testreport import Suite, Result, Check
+import project_config
 
 RC0_CH = 0          # Saleae digital channel on RC0 (signal A / PWM1)
 RC1_CH = 1          # Saleae digital channel on RC1 (signal B / PWM2)
@@ -367,7 +368,8 @@ def run_selftest(args):
 
 def main():
     ap = argparse.ArgumentParser(description="Saleae smoke test for Loop PWM firmware")
-    ap.add_argument("--port", default="COM12", help="serial port of the PIC console")
+    ap.add_argument("--port", default=project_config.flasher_port(),
+                    help="serial port of the PIC console")
     ap.add_argument("--sample-rate", type=int, default=10_000_000,
                     help="Saleae digital sample rate in S/s (default 10 MS/s)")
     ap.add_argument("--csv-dir", default=os.path.join(os.path.dirname(__file__), "smoketest_csv"),

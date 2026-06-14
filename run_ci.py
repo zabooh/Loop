@@ -29,6 +29,7 @@ import regression
 import smoketest
 from smoketest import Console
 from testreport import Suite, Result, Check, write_html
+import project_config
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
 
@@ -67,7 +68,7 @@ def run_flash() -> Result:
 
 def main():
     ap = argparse.ArgumentParser(description="Build/flash/test CI with HTML report")
-    ap.add_argument("--port", default="COM12")
+    ap.add_argument("--port", default=project_config.flasher_port())
     ap.add_argument("--sample-rate", type=int, default=10_000_000)
     ap.add_argument("--device-id", default=None)
     ap.add_argument("--automation-port", type=int, default=10430)

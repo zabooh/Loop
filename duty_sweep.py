@@ -33,6 +33,7 @@ import numpy as np
 
 from smoketest import Console, analyze_digital_csv
 from freq_sweep import capture_freq
+import project_config
 
 RC0_CH = 0                       # Saleae digital channel wired to RC0 (PWM1)
 
@@ -152,7 +153,8 @@ def plot(rows, freqs, args):
 def main():
     here = os.path.dirname(os.path.abspath(__file__))
     ap = argparse.ArgumentParser(description="Saleae-verified PWM duty-cycle sweep")
-    ap.add_argument("--port", default="COM12", help="serial port of the PIC console")
+    ap.add_argument("--port", default=project_config.flasher_port(),
+                    help="serial port of the PIC console")
     ap.add_argument("--freqs", default="1000,10000,50000",
                     help="comma-separated frequencies in Hz")
     ap.add_argument("--duty-step", type=int, default=5, help="duty sweep step in %%")

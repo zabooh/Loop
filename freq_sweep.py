@@ -35,6 +35,7 @@ import numpy as np
 
 # reuse the proven serial console and CSV analyser from the smoke test
 from smoketest import Console, analyze_digital_csv
+import project_config
 
 RC0_CH = 0                       # Saleae digital channel wired to RC0 (PWM1)
 
@@ -177,7 +178,8 @@ def plot(rows, args):
 def main():
     here = os.path.dirname(os.path.abspath(__file__))
     ap = argparse.ArgumentParser(description="Saleae-verified PWM frequency sweep")
-    ap.add_argument("--port", default="COM12", help="serial port of the PIC console")
+    ap.add_argument("--port", default=project_config.flasher_port(),
+                    help="serial port of the PIC console")
     ap.add_argument("--fmin", type=int, default=244, help="lowest requested Hz")
     ap.add_argument("--fmax", type=int, default=100_000, help="highest requested Hz")
     ap.add_argument("--points", type=int, default=50, help="number of sweep points (log-spaced)")

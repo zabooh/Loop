@@ -17,6 +17,7 @@ duty cycle. The project can be built and flashed entirely from the command line
   - [How the PWM is generated](#how-the-pwm-is-generated)
   - [Achievable frequencies](#achievable-frequencies)
 - [Build, flash and run](#build-flash-and-run)
+  - [First-time setup (after cloning)](#first-time-setup-after-cloning)
   - [In VS Code](#in-vs-code)
   - [From the command line](#from-the-command-line)
   - [Watching the console](#watching-the-console)
@@ -157,6 +158,27 @@ Notes:
 
 Connect the Curiosity Nano via USB first (the on-board PKOB nano debugger is
 detected automatically).
+
+### First-time setup (after cloning)
+
+Two Python helpers adapt a fresh clone to your machine (both support `--auto` to
+run unattended):
+
+```
+python setup_compiler.py    :: choose the installed XC8 version, patch toolchain.cmake
+python setup_flasher.py     :: detect the Curiosity Nano, store its COM port
+```
+
+- `setup_compiler.py` scans `C:\Program Files\Microchip\xc8\`, lets you pick a
+  version and patches `cmake/Loop/default/.generated/toolchain.cmake` so
+  `build.bat` uses it — run it if your XC8 version/location differs from the one
+  baked into the committed `toolchain.cmake`. Saves `setup_compiler.config`.
+- `setup_flasher.py` finds the board's *Curiosity Virtual COM Port* and writes
+  `setup_flasher.config`; the Python tools (`smoketest.py`, `regression.py`,
+  `run_ci.py`, …) then default their `--port` to it (fallback `COM12`). Flashing
+  itself auto-detects the on-board `pkobnano` debugger.
+
+After that, `build.bat` / `flash.py` / `run_ci.py` work with no extra arguments.
 
 ### In VS Code
 
@@ -314,6 +336,9 @@ are present in the folder.
 | Path                    | Purpose                                                                                                                             |
 |-------------------------|-------------------------------------------------------------------------------------------------------------------------------------|
 | main.c                  | Application: UART console, command parser and hardware PWM control                                                                  |
+| setup_compiler.py       | Pick the XC8 version and patch `toolchain.cmake` (writes `setup_compiler.config`)                                                   |
+| setup_flasher.py        | Detect the Curiosity Nano COM port (writes `setup_flasher.config`)                                                                  |
+| project_config.py       | Reads `setup_flasher.config` for the tools' default `--port`                                                                        |
 | build.bat               | Command-line build wrapper (CMake preset + Ninja)                                                                                   |
 | flash.py                | Command-line flash tool driving the MPLAB MDB (programs over ICSP)                                                                  |
 | smoketest.py            | Hardware smoke test: drives the console + Saleae, exports CSV and checks freq/duty                                                  |
