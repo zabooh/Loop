@@ -10,6 +10,13 @@ configure and start/stop two hardware PWM channels with adjustable frequency and
 duty cycle. The project can be built and flashed entirely from the command line
 (`build.bat` + `flash.py`).
 
+> **Built with Claude Code.** The entire firmware and tooling in this repository
+> was generated with [Claude Code](https://www.anthropic.com/claude-code) — the
+> C firmware, the build/flash/test scripts, the CI report and this documentation.
+> Install the **Claude Code extension for VS Code** to keep working this way: just
+> describe a change in natural language and Claude edits the code, builds, flashes
+> and runs the tests for you, so the project stays easy to extend and modify.
+
 ## Contents
 
 - [Hardware / pin map](#hardware--pin-map)
