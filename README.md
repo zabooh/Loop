@@ -61,12 +61,18 @@ not install them — only the Python packages are installed automatically.
 | Python 3.9+ and `pip` | every `.py` tool and the installer | Python 3.14 tested |
 | MPLAB XC8 compiler | building the firmware | `C:\Program Files\Microchip\xc8\` (v3.10) |
 | MPLAB X IDE | provides `mdb.bat` for flashing **and** the PIC16F1xxxx DFP | `C:\Program Files\Microchip\MPLABX\` (v6.25) |
-| CMake ≥ 3.24 | build system | on `PATH` or `C:\Program Files\CMake\bin` |
-| Ninja | build generator | on `PATH` |
+| **VS Code + MPLAB extension pack** | IDE build/flash (Ctrl+Shift+B) — **also installs CMake + Ninja** | recommended |
+| CMake ≥ 3.24 | build system | comes with the MPLAB VS Code extension, or install standalone |
+| Ninja | build generator | comes with the MPLAB VS Code extension, or install standalone |
+
+> Installing **VS Code with the MPLAB extension pack** is the easiest route — it
+> pulls in **CMake and Ninja** for you, so you don't install those separately.
+> The command-line `build.bat` needs them reachable on `PATH`; `install.bat`'s
+> toolchain check reports whether they are, and if not you can install CMake/Ninja
+> standalone (or add the extension's bundled copies to `PATH`).
 
 Optional, depending on what you do:
 
-- **MPLAB extension for VS Code** — to build/flash from the IDE (Ctrl+Shift+B).
 - **Saleae Logic 2 + a logic analyzer** — only for the hardware tests
   (`smoketest.py`, `freq_sweep.py`, `duty_sweep.py`, `run_ci.py`). Enable the
   automation server (Preferences → Automation, port 10430) and wire ch0 → RC0,
