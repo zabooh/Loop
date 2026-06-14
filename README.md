@@ -294,9 +294,20 @@ tolerance), duty within **2 percentage points**; a disabled channel must read
 low. The captured raw data is written to `smoketest_csv\test<N>\digital.csv`, so
 `--analyze` can re-evaluate it offline at any time.
 
-Example result (all four cases passing): 1 kHz @ 25 %/75 %, 5 kHz @ 10 %/50 %,
-20 kHz @ 33.3 %/66.7 %, and one channel disabled — measured duty matched the
-firmware's quantised values exactly, frequency to within the oscillator tolerance.
+Beyond the four per-frequency cases the suite runs two cross-checks that capture
+both pins at once:
+
+- **Duty held across frequency** — set 30 % and sweep the frequency; the measured
+  duty must stay 30 % (the firmware rescales the 10-bit value when `N` changes).
+- **Channel independence (RC0 vs RC1)** — the channels share the frequency but
+  their duty and on/off are per-channel. The test changes/disables one channel
+  and confirms the *other* is undisturbed, e.g. `change A→80 %, B stays 75 %`,
+  then `A off, B stays 10 %`. All steps pass on real hardware.
+
+Example result (all six cases passing): 1 kHz @ 25 %/75 %, 5 kHz @ 10 %/50 %,
+20 kHz @ 33.3 %/66.7 %, one channel disabled, duty-held and channel-independence —
+measured duty matched the firmware's quantised values exactly, frequency to within
+the oscillator tolerance.
 
 ## Frequency sweep
 

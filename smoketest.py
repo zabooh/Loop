@@ -269,6 +269,53 @@ def test_duty_hold(console, manager, sample_rate, base_outdir, device_id) -> Res
                   checks, ["Frequency", "measured", "firmware", "set", "result"], rows)
 
 
+def test_channel_independence(console, manager, sample_rate, base_outdir, device_id) -> Result:
+    """The channels share the frequency but their duty and on/off must be
+    independent: changing or disabling one must not disturb the other.
+    Both pins are captured simultaneously at each step."""
+    f = 5000
+    console.cmd(f"pulse freq {f}")
+    duration = max(0.05, 80.0 / f)
+    print(f"\n--- Channel independence at {f} Hz ---")
+
+    steps = [
+        # name,                          da, db, a_on,  b_on
+        ("baseline A=25% B=75%",         25, 75, True,  True),
+        ("change A->80%, B stays 75%",   80, 75, True,  True),
+        ("change B->10%, A stays 80%",   80, 10, True,  True),
+        ("A off, B stays 10%",           80, 10, False, True),
+        ("B off, A stays 80%",           80, 10, True,  False),
+    ]
+
+    checks, rows = [], []
+    for i, (name, da, db, a_on, b_on) in enumerate(steps):
+        console.cmd(f"pulse a duty {da}")
+        console.cmd(f"pulse b duty {db}")
+        console.cmd("pulse a on" if a_on else "pulse a off")
+        console.cmd("pulse b on" if b_on else "pulse b off")
+        csv = saleae_capture(manager, [RC0_CH, RC1_CH], sample_rate, duration,
+                             os.path.join(base_outdir, f"indep{i}"), device_id)
+        mA = analyze_digital_csv(csv, RC0_CH)
+        mB = analyze_digital_csv(csv, RC1_CH)
+
+        okA = (abs(mA["duty_pct"] - da) <= DUTY_TOL) if a_on \
+            else (mA["cycles"] == 0 and mA["level"] == 0)
+        okB = (abs(mB["duty_pct"] - db) <= DUTY_TOL) if b_on \
+            else (mB["cycles"] == 0 and mB["level"] == 0)
+        ok = okA and okB
+        a_str = f"{mA['duty_pct']:.1f}%" if a_on else f"low(cyc={mA['cycles']})"
+        b_str = f"{mB['duty_pct']:.1f}%" if b_on else f"low(cyc={mB['cycles']})"
+        checks.append(Check(name, ok, f"RC0={a_str}, RC1={b_str}"))
+        rows.append([name, f"{da}%" if a_on else "off", a_str,
+                     f"{db}%" if b_on else "off", b_str, "PASS" if ok else "FAIL"])
+        print(f"      [{'PASS' if ok else 'FAIL'}] {name}: RC0={a_str}, RC1={b_str}")
+
+    return Result("Channel independence (RC0 vs RC1)",
+                  all(c.passed for c in checks),
+                  "duty and on/off are per-channel; one must not disturb the other",
+                  checks, ["Step", "set A", "meas RC0", "set B", "meas RC1", "result"], rows)
+
+
 def run_suite(console, manager, device_id, sample_rate, base_outdir) -> Suite:
     """Run all Saleae smoke-test cases and return a Suite of Results."""
     os.makedirs(base_outdir, exist_ok=True)
@@ -277,6 +324,7 @@ def run_suite(console, manager, device_id, sample_rate, base_outdir) -> Suite:
     for i, case in enumerate(TEST_CASES, 1):
         suite.add(run_case(console, manager, case, sample_rate, base_outdir, device_id, i))
     suite.add(test_duty_hold(console, manager, sample_rate, base_outdir, device_id))
+    suite.add(test_channel_independence(console, manager, sample_rate, base_outdir, device_id))
     return suite
 
 
