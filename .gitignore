@@ -27,3 +27,10 @@ _build/
 cmake/**/.generated/*
 cmake/**/CMake*
 out/
+
+# --- Keep the CMake project files in the repo so a fresh clone builds from the
+#     command line (overrides the MPLAB ignore rules above). Note: the generated
+#     toolchain.cmake hardcodes the absolute XC8 path of this machine. ---
+!cmake/**/.generated/*
+!cmake/**/CMakeLists.txt
+!cmake/**/CMakePresets.json
