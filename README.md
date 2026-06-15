@@ -133,6 +133,20 @@ python run_ci.py
 | `pulse a\|b on\|off`     | enable/disable a channel output (RC0/RC1)         |
 | `pulse a\|b duty <pct>`  | set a channel's duty cycle in percent             |
 | `pulse status`           | show frequency, duty and on/off state of both     |
+| `clb on\|off`            | half-bridge on RC0/RC1 (fine, live dead-time)     |
+| `clb dt <0-255>`         | dead-time in 31.25 ns ticks (live)                |
+| `clb freq <0-1>`         | half-bridge PWM: 0 = ~125 kHz, 1 = ~62.5 kHz      |
+| `clb status`             | show half-bridge on/off + dead-time + frequency   |
+| `pinid`                  | GPIO-toggle RC0..RC3 (1x/2x/3x/4x) to verify wiring|
+
+The `clb*` commands drive a **complementary half-bridge with runtime-adjustable
+dead-time** built from the on-chip CLB + CLC + TMR2 fabric — a separate sub-project
+documented in its own file, **[readme_clb.md](readme_clb.md)**: fine, live-adjustable
+dead-time `dt × 31.25 ns` with two octave frequencies, non-overlap (no shoot-through)
+guaranteed by construction. See readme_clb.md for the block diagram, measured
+waveforms and the full hardware-in-the-loop toolchain. (`pinid` is a bench
+diagnostic: it blinks each of RC0..RC3 a unique number of times so a logic-analyzer
+capture confirms the probe wiring RC0→D0 … RC3→D3.)
 
 Frequency and duty accept **floating-point** values (e.g. `pulse a duty 33.3`).
 Because the hardware quantises both (10-bit duty, integer Timer2 divider), the
@@ -275,46 +289,55 @@ sheet and the installed device family pack (DFP `PIC16F1xxxx_DFP`).
 
 ## Hardware smoke test
 
-`smoketest.py` verifies the PWM output in hardware with a Saleae logic analyzer:
-it drives the console over the serial port, records RC0/RC1, exports the raw data
-to CSV and checks the measured frequency and duty cycle against what the firmware
-reports it generated.
+`smoketest.py` is the all-in-one hardware test. It drives the console over the
+serial port, records RC0/RC1 with a Saleae logic analyzer, and writes one
+self-contained **`smoketest_report.html`** (PASS/FAIL banner, per-suite tables and
+embedded plots). It runs **three suites**:
+
+1. **CLI regression (serial only)** — console behaviour without the analyzer:
+   input validation & boundaries (frequency limits, duty clamp, bad input, unknown
+   commands), the line editor & history, an RX-stress burst (30 commands streamed
+   with none dropped) and `reset` → power-on defaults.
+2. **PWM smoke (Saleae)** — for each case it sends `pulse freq/duty/on/off`,
+   captures both pins and checks the measured frequency and duty against what the
+   firmware reports it generated. Pass criteria: frequency within **3 %** (covers
+   the HFINTOSC ±2 % tolerance), duty within **2 pp**; a disabled channel must read
+   low. Two cross-checks also run: **duty held across frequency** (set 30 %, sweep
+   the frequency — duty must stay 30 %) and **channel independence** (changing or
+   disabling one channel must not disturb the other).
+3. **Half-bridge (CLB)** — sweeps the `clb` half-bridge over its two carrier
+   frequencies (125 / 62.5 kHz) × six dead-times (`clb dt 2…64`), measuring HS/LS
+   on RC0/RC1 at 100 MS/s. It verifies the **dead-time tracks `dt × 31.25 ns`** (to
+   within ~1 tick), that there is **no shoot-through** (HS/LS never both high) and
+   the carrier accuracy. The report embeds the block diagram and the dead-time
+   linearity / error / overlap / waveform plots. *(This is the comprehensive
+   stand-alone report from `clb_hb_report.py`, folded into the smoke test.)*
 
 Setup:
 
 - Saleae **channel 0 → RC0**, **channel 1 → RC1**, common ground.
 - Logic 2 running with the **automation server enabled**
   (Preferences → Automation, default port 10430).
-- `pip install logic2-automation pyserial`
+- `pip install logic2-automation pyserial matplotlib`
 
 ```
-python smoketest.py                       :: full HW test on COM12
-python smoketest.py --sample-rate 25000000:: use a different sample rate
-python smoketest.py --analyze smoketest_csv\test3 :: re-analyse an existing CSV
-python smoketest.py --selftest            :: validate the analyser (no hardware)
+python smoketest.py                        :: all three suites -> smoketest_report.html
+python smoketest.py --no-halfbridge        :: regression + PWM only
+python smoketest.py --no-regression --no-pwm :: half-bridge sweep only
+python smoketest.py --report out.html      :: choose the report path
+python smoketest.py --sample-rate 25000000 :: PWM-capture sample rate
+python smoketest.py --analyze smoketest_csv\test3 :: re-analyse an existing CSV (no HW)
+python smoketest.py --selftest             :: validate the analyser (no hardware)
 ```
 
-For each case it sends `pulse freq/duty/on/off`, captures both channels, and
-measures frequency (median of rising-edge intervals) and duty (high-time /
-period). Pass criteria: frequency within **3 %** (covers the HFINTOSC ±2 %
-tolerance), duty within **2 percentage points**; a disabled channel must read
-low. The captured raw data is written to `smoketest_csv\test<N>\digital.csv`, so
-`--analyze` can re-evaluate it offline at any time.
+Captured raw data is kept under `smoketest_csv\` (e.g. `test<N>\digital.csv`,
+`halfbridge\…`), so `--analyze` can re-evaluate a capture offline at any time.
 
-Beyond the four per-frequency cases the suite runs two cross-checks that capture
-both pins at once:
-
-- **Duty held across frequency** — set 30 % and sweep the frequency; the measured
-  duty must stay 30 % (the firmware rescales the 10-bit value when `N` changes).
-- **Channel independence (RC0 vs RC1)** — the channels share the frequency but
-  their duty and on/off are per-channel. The test changes/disables one channel
-  and confirms the *other* is undisturbed, e.g. `change A→80 %, B stays 75 %`,
-  then `A off, B stays 10 %`. All steps pass on real hardware.
-
-Example result (all six cases passing): 1 kHz @ 25 %/75 %, 5 kHz @ 10 %/50 %,
-20 kHz @ 33.3 %/66.7 %, one channel disabled, duty-held and channel-independence —
-measured duty matched the firmware's quantised values exactly, frequency to within
-the oscillator tolerance.
+Example result — all suites passing: CLI regression 4/4; PWM 6/6 (1 kHz @ 25/75 %,
+5 kHz @ 10/50 %, 20 kHz @ 33.3/66.7 %, one channel off, duty-held, channel
+independence); half-bridge 2/2 — dead-time matched `dt × 31.25 ns` within ~10 ns
+(one sample) and **0 ns shoot-through** at every setting, carrier to within the
+oscillator tolerance.
 
 ## Frequency sweep
 
@@ -386,7 +409,9 @@ python regression.py            :: run on COM12, write regression_report.html
 
 It writes its own `regression_report.html`. (These tests once caught a real
 bug — `pulse freq 9000000` was silently accepted because the millivalue parser
-overflowed; the frequency path now parses integer Hz directly.)
+overflowed; the frequency path now parses integer Hz directly.) The same suite is
+also run as the first stage of `smoketest.py` (above), so a single `smoketest.py`
+run covers CLI regression + PWM + half-bridge.
 
 ## Continuous integration (one command)
 
@@ -419,7 +444,8 @@ are present in the folder.
 | project_config.py       | Reads `setup_flasher.config` for the tools' default `--port`                                                                        |
 | build.bat               | Command-line build wrapper (CMake preset + Ninja)                                                                                   |
 | flash.py                | Command-line flash tool driving the MPLAB MDB (programs over ICSP)                                                                  |
-| smoketest.py            | Hardware smoke test: drives the console + Saleae, exports CSV and checks freq/duty                                                  |
+| smoketest.py            | All-in-one HW test: CLI regression + PWM smoke + CLB half-bridge sweep → `smoketest_report.html` (with plots)                       |
+| clb_hb_report.py        | Stand-alone CLB half-bridge report (freq × dead-time sweep, plots) → `clb_hb_report.html`; its measurement/plot code is reused by smoketest |
 | freq_sweep.py           | Saleae-verified frequency sweep; plots deviation vs. requested (matplotlib)                                                         |
 | duty_sweep.py           | Saleae-verified duty-cycle sweep at several frequencies; plots deviation (matplotlib)                                               |
 | regression.py           | Serial-only regression suite (validation, line editor, RX stress, reset)                                                            |

@@ -38,7 +38,7 @@ import statistics
 import sys
 import time
 
-from testreport import Suite, Result, Check
+from testreport import Suite, Result, Check, write_html
 import project_config
 
 RC0_CH = 0          # Saleae digital channel on RC0 (signal A / PWM1)
@@ -328,6 +328,85 @@ def run_suite(console, manager, device_id, sample_rate, base_outdir) -> Suite:
     return suite
 
 
+# ===================== Half-bridge (CLB) test ========================
+HB_DT_TOL_NS = 35.0      # dead-time must land within ~1 tick (31.25 ns) of commanded
+HB_OVL_TOL_NS = 20.0     # both-high (shoot-through) must be essentially zero
+
+
+def run_halfbridge_suite(console, manager, device_id, base_outdir):
+    """Sweep the CLB half-bridge over frequency x dead-time, measure HS/LS on
+    RC0/RC1, and return (Suite, images). Reuses clb_hb_report's measurement,
+    analysis and plotting so the report carries the same data and diagrams."""
+    import clb_hb_report as hb            # lazy: avoids the smoketest<->clb_hb_report cycle
+    from clb_halfbridge_test import _read_states
+    os.makedirs(base_outdir, exist_ok=True)
+
+    console.cmd("reset"); time.sleep(1.0)  # clear sticky CLB state (documented)
+    rows, wave = [], None
+    for code, fhz in hb.FREQS:
+        for dt in hb.DTS:
+            console.cmd("clb off"); console.cmd(f"clb freq {code}")
+            console.cmd(f"clb dt {dt}"); console.cmd("clb on"); time.sleep(0.05)
+            path = saleae_capture(manager, [RC0_CH, RC1_CH], hb.RATE, 0.005,
+                                  os.path.join(base_outdir, f"hb_f{code}_dt{dt}"), device_id)
+            st = _read_states(path)
+            a = hb.analyze(st)
+            a.update(code=code, fnom=fhz, dt=dt, dt_nom=dt * hb.TICK_NS)
+            rows.append(a)
+            print(f"      HB f{code}({fhz}Hz) dt{dt}: f={a['freq']/1e3:.1f}k "
+                  f"dead={a['dt_med']:.0f}ns(nom {dt*hb.TICK_NS:.0f}) ovl={a['overlap_ns']:.0f}ns")
+            if (code, dt) == hb.WAVE:
+                wave = st
+    console.cmd("clb off")
+
+    # ---- build the Suite: one Result per carrier frequency, dt sweep inside ----
+    suite = Suite("Half-bridge (CLB)",
+                  "Complementary HS (RC0) / LS (RC1) with runtime dead-time. Dead-time "
+                  "should track dt x 31.25 ns; the two sides must never overlap.")
+    for code, fhz in hb.FREQS:
+        sub = [r for r in rows if r["code"] == code]
+        favg = statistics.mean(r["freq"] for r in sub)
+        freq_ok = abs(favg - fhz) <= fhz * FREQ_TOL
+        dt_ok = all(abs(r["dt_med"] - r["dt_nom"]) <= HB_DT_TOL_NS for r in sub)
+        ovl_ok = all(r["overlap_ns"] <= HB_OVL_TOL_NS for r in sub)
+        checks = [
+            Check(f"carrier {fhz/1000:.1f} kHz within {FREQ_TOL*100:.0f}%", freq_ok,
+                  f"measured {favg/1e3:.2f} kHz"),
+            Check("dead-time within ~1 tick (31.25 ns) of commanded, every step", dt_ok,
+                  "max err %.0f ns" % max(abs(r["dt_med"]-r["dt_nom"]) for r in sub)),
+            Check("no shoot-through (both-high ~ 0) at every step", ovl_ok,
+                  "max overlap %.0f ns" % max(r["overlap_ns"] for r in sub)),
+        ]
+        trows = [[r["dt"], f"{r['dt_nom']:.0f}", f"{r['dt_med']:.0f}",
+                  f"{r['dt_med']-r['dt_nom']:+.0f}", f"{r['overlap_ns']:.0f}",
+                  f"{r['freq']/1e3:.2f}", f"{r['duty_hs']*100:.1f}",
+                  "PASS" if (abs(r['dt_med']-r['dt_nom'])<=HB_DT_TOL_NS and
+                             r['overlap_ns']<=HB_OVL_TOL_NS) else "FAIL"] for r in sub]
+        suite.add(Result(
+            f"{fhz/1000:.1f} kHz carrier - dead-time sweep",
+            freq_ok and dt_ok and ovl_ok,
+            f"dt {hb.DTS[0]}..{hb.DTS[-1]} ticks; carrier {favg/1e3:.2f} kHz measured",
+            checks,
+            ["clb dt", "nom [ns]", "meas [ns]", "err [ns]", "overlap [ns]", "freq [kHz]",
+             "HS duty [%]", "result"], trows))
+
+    # ---- plots as self-contained data URIs (reuse clb_hb_report's plotters) ----
+    def uri(b64):
+        return "data:image/png;base64," + b64
+    images = []
+    if os.path.exists(hb.BLOCKDIAG):
+        images.append(("Block diagram - CLB counter + TMR2 dead-time + CLC gating",
+                       uri(hb._file_b64(hb.BLOCKDIAG))))
+    images += [
+        ("Dead-time: measured vs. commanded (linearity)", uri(hb.plot_linearity(rows))),
+        ("Dead-time error vs. commanded value", uri(hb.plot_error(rows))),
+        ("Shoot-through overlap across all settings", uri(hb.plot_overlap(rows))),
+    ]
+    if wave:
+        images.append(("HS/LS waveforms + dead-time zoom", uri(hb.plot_wave(wave))))
+    return suite, images
+
+
 def run_hardware(args):
     from saleae import automation
     print(f"Opening serial console on {args.port} ...")
@@ -346,15 +425,40 @@ def run_hardware(args):
         device_id = devs[0].device_id
         print(f"  using device {device_id} ({devs[0].device_type})")
 
+    suites, images = [], []
     try:
-        suite = run_suite(console, manager, device_id, args.sample_rate, args.csv_dir)
+        if not args.no_regression:
+            print("\n=== CLI regression (serial only) ===")
+            import regression                 # lazy: regression imports Console from us
+            suites.append(regression.run(console))   # ends by rebooting the device
+        if not args.no_pwm:
+            suites.append(run_suite(console, manager, device_id, args.sample_rate, args.csv_dir))
+        if not args.no_halfbridge:
+            print("\n=== Half-bridge (CLB) frequency x dead-time sweep ===")
+            try:
+                hb_suite, images = run_halfbridge_suite(
+                    console, manager, device_id, os.path.join(args.csv_dir, "halfbridge"))
+                suites.append(hb_suite)
+            except Exception as e:
+                s = Suite("Half-bridge (CLB)", "frequency x dead-time sweep")
+                s.skipped = True; s.skip_reason = f"half-bridge test error: {e}"
+                suites.append(s)
+                print(f"  half-bridge test skipped: {e}")
     finally:
         console.close()
         manager.close()
 
-    npass = sum(1 for r in suite.results if r.passed)
-    print(f"\n================  {npass}/{len(suite.results)} cases passed  ================")
-    return 0 if suite.passed else 1
+    meta = {"Device": "PIC16F13145 Curiosity Nano", "Port": args.port,
+            "Sample rate": f"{args.sample_rate/1e6:.0f} MS/s (PWM), 100 MS/s (half-bridge)"}
+    overall = write_html(args.report, "Loop - PWM & Half-Bridge Smoke Test",
+                         meta, suites, images=images or None)
+    print(f"\nreport written: {args.report}")
+    for s in suites:
+        n = len(s.results); npass = sum(1 for r in s.results if r.passed)
+        tag = "SKIP" if s.skipped else f"{npass}/{n}"
+        print(f"  [{'PASS' if s.passed else ('SKIP' if s.skipped else 'FAIL')}] {s.name}: {tag}")
+    print(f"================  OVERALL: {'PASS' if overall else 'FAIL'}  ================")
+    return 0 if overall else 1
 
 
 # ============================ Offline modes ==========================
@@ -426,6 +530,14 @@ def main():
     ap.add_argument("--automation-port", type=int, default=10430)
     ap.add_argument("--quiet-cli", action="store_true",
                     help="do not echo the serial commands/responses")
+    ap.add_argument("--report", default=os.path.join(os.path.dirname(__file__), "smoketest_report.html"),
+                    help="output HTML report (PWM + half-bridge + plots)")
+    ap.add_argument("--no-halfbridge", action="store_true",
+                    help="skip the CLB half-bridge frequency/dead-time sweep")
+    ap.add_argument("--no-pwm", action="store_true",
+                    help="skip the plain-PWM smoke cases (half-bridge only)")
+    ap.add_argument("--no-regression", action="store_true",
+                    help="skip the serial-only CLI regression suite")
     ap.add_argument("--analyze", metavar="CSV_OR_DIR",
                     help="only analyse an existing digital.csv (no hardware)")
     ap.add_argument("--selftest", action="store_true",

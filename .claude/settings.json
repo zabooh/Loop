@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__devai-confluence__confluence-confluence_search",
+      "mcp__devai-jira__jira-jira_search",
+      "mcp__devai-bitbucket__bitbucket-search_repositories",
+      "mcp__devai-bitbucket__bitbucket-list_directory_content",
+      "mcp__devai-confluence__confluence-confluence_get_page",
+      "mcp__devai-jira__jira-jira_get_issue",
+      "mcp__devai-bitbucket__bitbucket-get_file_content",
+      "mcp__devai-bitbucket__bitbucket-search_code",
+      "mcp__devai-bitbucket__bitbucket-search_files"
+    ]
+  }
+}

@@ -10,10 +10,17 @@ __pycache__/
 /smoketest_csv/
 /freq_sweep_cap/
 /duty_sweep_cap/
+# CLB-effort capture dirs + synth/build scratch (all regenerated)
+*_csv/
+clb/.clb_build/
 
 # --- Logs / scratch ---
 /queuelogs/
 _*.txt
+build_log.txt
+dbg_out.txt
+*.log
+*.output
 
 .generated_files/
 build/
