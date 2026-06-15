@@ -26,6 +26,7 @@ duty cycle. The project can be built and flashed entirely from the command line
 - [Serial console commands](#serial-console-commands)
   - [How the PWM is generated](#how-the-pwm-is-generated)
   - [Achievable frequencies](#achievable-frequencies)
+  - [The CLB half-bridge](#the-clb-half-bridge)
 - [Build, flash and run](#build-flash-and-run)
   - [In VS Code](#in-vs-code)
   - [From the command line](#from-the-command-line)
@@ -140,11 +141,9 @@ python run_ci.py
 | `pinid`                  | GPIO-toggle RC0..RC3 (1x/2x/3x/4x) to verify wiring|
 
 The `clb*` commands drive a **complementary half-bridge with runtime-adjustable
-dead-time** built from the on-chip CLB + CLC + TMR2 fabric — a separate sub-project
-documented in its own file, **[readme_clb.md](readme_clb.md)**: fine, live-adjustable
-dead-time `dt × 31.25 ns` with two octave frequencies, non-overlap (no shoot-through)
-guaranteed by construction. See readme_clb.md for the block diagram, measured
-waveforms and the full hardware-in-the-loop toolchain. (`pinid` is a bench
+dead-time** on RC0/RC1 — described in [The CLB half-bridge](#the-clb-half-bridge)
+below, and in full detail (block diagram, measured waveforms, the hardware-in-the-loop
+toolchain) in its own file **[readme_clb.md](readme_clb.md)**. (`pinid` is a bench
 diagnostic: it blinks each of RC0..RC3 a unique number of times so a logic-analyzer
 capture confirms the probe wiring RC0→D0 … RC3→D3.)
 
@@ -244,6 +243,63 @@ Notes:
   (near 100 kHz, `N±1` already shifts the frequency by ~1 kHz).
 - For clean PWM with ≥ 8-bit duty, the practical range is **~244 Hz … ~120 kHz**.
   Higher still works, but the duty resolution becomes coarse.
+
+### The CLB half-bridge
+
+The `clb` commands turn RC0/RC1 into a **complementary half-bridge** — high-side
+(**HS**) on RC0, low-side (**LS**) on RC1 — with a **dead-time you can change at run
+time** from the console. The PIC16F13145 has no CWG (Complementary Waveform
+Generator), so the half-bridge is assembled from three on-chip blocks:
+
+- the **CLB** (Configurable Logic Block — an FPGA-like fabric loaded from a
+  synthesized bitstream) runs a free-running counter that generates the PWM carrier
+  on RC2;
+- **Timer2** in HLT mode is a retriggerable **monostable** that times the dead-time:
+  `T2PR = dt` ticks of the 32 MHz clock, i.e. **31.25 ns** each;
+- two **CLC** flip-flops combine the carrier and the dead-time pulse into the
+  complementary HS/LS pair.
+
+HS can only be high while the carrier is high and LS only while it is low, so
+**non-overlap (no shoot-through) is guaranteed by construction**, not by timing
+margins. The dead-time is clocked from Timer2 off the 32 MHz FOSC, so it stays
+`dt × 31.25 ns` regardless of which carrier frequency is selected.
+
+| Command          | Action                                                            |
+|------------------|-------------------------------------------------------------------|
+| `clb on`         | enable the half-bridge (RC0 = HS, RC1 = LS; RC2 carries the carrier) |
+| `clb off`        | disable — RC0/RC1 return to the plain `pulse` PWM modules         |
+| `clb dt <0-255>` | dead-time = `dt × 31.25 ns`, written live to Timer2 (default 3 ≈ 93 ns) |
+| `clb freq <0\|1>`| carrier: `0` = ~125 kHz, `1` = ~62.5 kHz (default 1; switchable live) |
+| `clb status`     | show on/off, dead-time (ticks + ns) and carrier frequency         |
+
+Only **two** carrier frequencies are offered — the `cnt[7]` / `cnt[8]` taps of the
+CLB counter — because the CLB place-and-route will not route a third tap. See
+[readme_clb.md](readme_clb.md) for the reason, the block diagram, the measured
+dead-time sweep and the full hardware-in-the-loop toolchain.
+
+Example session — 62.5 kHz carrier with a ~310 ns dead-time:
+
+```
+clb freq 1
+clb dt 10
+clb on
+clb status
+```
+
+→ `clb status` then reports e.g.:
+
+```
+CLB: ON, dead-time 10 ticks (~312 ns), PWM ~62500 Hz
+```
+
+Probe RC0 (HS) and RC1 (LS) with a scope or logic analyzer: they are complementary,
+never both high, with a ~310 ns both-low window on each switching edge. You can
+change the dead-time on the fly (`clb dt 2` … `clb dt 64`), switch the carrier
+(`clb freq 0`), then `clb off` to hand RC0/RC1 back to the `pulse` PWM channels.
+
+> While `clb on` is active it repurposes **Timer2** (the shared PWM time base) as the
+> dead-time monostable, so the `pulse` commands don't drive the pins until `clb off`
+> restores Timer2 to the PWM modules.
 
 ## Build, flash and run
 
