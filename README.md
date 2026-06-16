@@ -31,6 +31,7 @@ duty cycle. The project can be built and flashed entirely from the command line
   - [In VS Code](#in-vs-code)
   - [From the command line](#from-the-command-line)
   - [Watching the console](#watching-the-console)
+- [GUI control panel](#gui-control-panel)
 - [Hardware smoke test](#hardware-smoke-test)
 - [Frequency sweep](#frequency-sweep)
 - [Duty-cycle sweep](#duty-cycle-sweep)
@@ -343,6 +344,37 @@ this by default). You should see the build banner and `> ` prompt — then e.g.
 All registers, bits and configuration tokens are taken from the PIC16F13145 data
 sheet and the installed device family pack (DFP `PIC16F1xxxx_DFP`).
 
+## GUI control panel
+
+`gui.py` is a **Tkinter** desktop panel that drives the firmware over the serial
+console without typing commands. It opens the *Curiosity Virtual COM Port* at
+115200 8N1 (DTR/RTS asserted, the same convention the test tools use) and maps
+every console command to a graphical control:
+
+- **Connection** — COM-port dropdown (auto-filled, default from
+  `setup_flasher.config`), refresh, connect/disconnect and a status indicator. On
+  connect it queries `version` and the device status automatically.
+- **PWM** — a frequency entry with `Set` and quick presets (1k/10k/50k/100k), and
+  per-channel **on/off** plus a **duty slider** (0–100 %) for A (RC0) and B (RC1).
+  Each row shows the value the firmware reports it actually generates.
+- **CLB half-bridge** — an on/off switch, a **dead-time slider** (0–255, showing the
+  live `dt × 31.25 ns` in ns) and a **carrier** selector (~125 kHz / ~62.5 kHz).
+- **Device** — buttons for `version`, `Refresh status`, `pinid`, `Reset` and `help`.
+- **Console** — a live log of everything the firmware prints (driven by a background
+  reader thread), a **raw command line** for anything not on the panel (`clbraw`,
+  `clbsw`, `clbck`, …) and a *Clear log* button.
+
+The reader thread also scrapes the `pulse status` / `clb status` lines, so the
+sliders, switches and labels track the device's real state.
+
+```cmd
+python gui.py                 :: port auto-detected from setup_flasher.config
+python gui.py --port COM7     :: override the port
+```
+
+`tkinter` ships with CPython; the only extra dependency is `pyserial`, already in
+`requirements.txt`. A board must be connected for the controls to do anything.
+
 ## Hardware smoke test
 
 `smoketest.py` is the all-in-one hardware test. It drives the console over the
@@ -500,6 +532,7 @@ are present in the folder.
 | project_config.py       | Reads `setup_flasher.config` for the tools' default `--port`                                                                        |
 | build.bat               | Command-line build wrapper (CMake preset + Ninja)                                                                                   |
 | flash.py                | Command-line flash tool driving the MPLAB MDB (programs over ICSP)                                                                  |
+| gui.py                  | Tkinter control panel: connect over serial and drive PWM + CLB half-bridge from sliders/buttons, with a live console + raw command line |
 | smoketest.py            | All-in-one HW test: CLI regression + PWM smoke + CLB half-bridge sweep → `smoketest_report.html` (with plots)                       |
 | clb_hb_report.py        | Stand-alone CLB half-bridge report (freq × dead-time sweep, plots) → `clb_hb_report.html`; its measurement/plot code is reused by smoketest |
 | freq_sweep.py           | Saleae-verified frequency sweep; plots deviation vs. requested (matplotlib)                                                         |
