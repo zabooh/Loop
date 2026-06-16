@@ -37,6 +37,7 @@ duty cycle. The project can be built and flashed entirely from the command line
 - [Duty-cycle sweep](#duty-cycle-sweep)
 - [Serial regression tests](#serial-regression-tests)
 - [Continuous integration (one command)](#continuous-integration-one-command)
+- [Presentation](#presentation)
 - [Project structure](#project-structure)
 - [Discussion of the measurement results](#discussion-of-the-measurement-results)
 
@@ -520,6 +521,23 @@ in the header. The process exit code is 0 only if everything passed, so it drops
 straight into a CI job. The frequency- and duty-sweep plots are embedded if they
 are present in the folder.
 
+## Presentation
+
+`loop_automation.pptx` is a slide deck that walks through the whole story of this
+project: the automated **build → flash → verify** pipeline, the serial CLI under
+test (shown as a live terminal session on COM12 @ 115200 baud, alongside the
+generated PWM signal), the hardware-in-the-loop setup with a photo of the real
+Saleae + Curiosity Nano bench, the Saleae-verified frequency and duty-cycle sweeps,
+and the CLB half-bridge — its design, measured dead-time results and capability map.
+
+A closing slide reflects honestly on *why* an LLM can configure a logic peripheral
+at all: register setup is documentation-driven pattern work, the knowledge comes
+from datasheet/MCC lookups rather than memory alone, and the hardware-in-the-loop
+(flash → measure → compare → fix) is what actually caught the real bugs. It also
+states the honest limit — the CLB *logic fabric* is synthesised by an external
+Microchip tool (`pyclbsynthesizer`), not generated headlessly; only a small
+free-running counter routes reliably.
+
 ## Project structure
 
 | Path                    | Purpose                                                                                                                             |
@@ -541,6 +559,7 @@ are present in the folder.
 | run_ci.py               | One-command CI: build → flash → regression + smoke → `report.html`                                                                  |
 | testreport.py           | Shared result model + self-contained HTML report writer                                                                            |
 | report.html             | Generated CI protocol (overall verdict + every check); `regression_report.html` likewise                                           |
+| loop_automation.pptx    | Slide deck presenting the automated build/flash/test workflow and the CLB half-bridge (see [Presentation](#presentation))           |
 | docs                    | Reference images (e.g. the Curiosity Nano pinout shown above)                                                                       |
 | smoketest_csv           | Raw `digital.csv` captures from the last smoke-test run (re-analysable)                                                             |
 | _build                  | The [CMake build tree](https://cmake.org/cmake/help/latest/manual/cmake.1.html#introduction-to-cmake-buildsystems), can be deleted. |
