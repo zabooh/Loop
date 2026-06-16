@@ -21,7 +21,7 @@ import sys
 
 import serial.tools.list_ports
 
-_HERE = os.path.dirname(os.path.abspath(__file__))
+_HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CONFIG_FILE = os.path.join(_HERE, "setup_flasher.config")
 
 

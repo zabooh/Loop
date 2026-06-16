@@ -25,7 +25,7 @@ import project_config
 from smoketest import Console, saleae_capture
 from clb_halfbridge_test import _read_states
 
-ROOT = os.path.dirname(os.path.abspath(__file__))
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CSV_DIR = os.path.join(ROOT, "hbr_csv")
 OUT = os.path.join(ROOT, "clb_hb_report.html")
 BLOCKDIAG = os.path.join(ROOT, "clb", "clb_blockdiagram.png")

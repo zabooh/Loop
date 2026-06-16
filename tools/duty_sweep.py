@@ -84,7 +84,7 @@ def run_sweep(args):
         device_id = devs[0].device_id
         print(f"  using device {device_id} ({devs[0].device_type})")
 
-    capdir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "duty_sweep_cap")
+    capdir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "duty_sweep_cap")
     rows = []   # (freq, req_duty, fw_duty, meas_duty, dev)
     try:
         for f in freqs:
@@ -169,7 +169,7 @@ def plot(rows, freqs, args):
 
 
 def main():
-    here = os.path.dirname(os.path.abspath(__file__))
+    here = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     ap = argparse.ArgumentParser(description="Saleae-verified PWM duty-cycle sweep")
     ap.add_argument("--port", default=project_config.flasher_port(),
                     help="serial port of the PIC console")

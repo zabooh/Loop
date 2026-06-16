@@ -38,7 +38,7 @@ import sys
 import threading
 import time
 
-_HERE = os.path.dirname(os.path.abspath(__file__))
+_HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 HEX_DEFAULT = os.path.join(_HERE, "out", "Loop", "default.hex")
 MCU_DEFAULT = "PIC16F13145"

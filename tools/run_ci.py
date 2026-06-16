@@ -31,7 +31,7 @@ from smoketest import Console
 from testreport import Suite, Result, Check, write_html
 import project_config
 
-ROOT = os.path.dirname(os.path.abspath(__file__))
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
 def run_build() -> Result:

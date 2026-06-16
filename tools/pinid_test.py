@@ -15,7 +15,7 @@ import time
 import project_config
 from smoketest import Console, saleae_capture
 
-OUT = os.path.join(os.path.dirname(__file__), "pinid_csv")
+OUT = os.path.join(os.path.dirname(os.path.dirname(__file__)), "pinid_csv")
 CHANNELS = [0, 1, 2, 3]
 SAMPLE_RATE = 1_000_000         # min allowed; 5 ms pulse -> 5000 samples, ample
 DURATION = 2.6                  # covers the ~2.3 s pinid burst

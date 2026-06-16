@@ -21,8 +21,9 @@ import shutil
 import subprocess
 import sys
 
-HERE = os.path.dirname(os.path.abspath(__file__))
-REQ = os.path.join(HERE, "requirements.txt")
+HERE = os.path.dirname(os.path.abspath(__file__))        # tools/ (siblings: setup_*.py)
+ROOT = os.path.dirname(HERE)                             # repo root (build.bat, requirements.txt)
+REQ = os.path.join(ROOT, "requirements.txt")
 
 
 def _run(cmd):

@@ -19,7 +19,7 @@ import os
 import re
 import sys
 
-SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+SCRIPT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CONFIG_FILE = os.path.join(SCRIPT_DIR, "setup_compiler.config")
 TOOLCHAIN_CMAKE = os.path.join(
     SCRIPT_DIR, "cmake", "Loop", "default", ".generated", "toolchain.cmake")

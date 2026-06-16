@@ -524,13 +524,13 @@ def main():
                     help="serial port of the PIC console")
     ap.add_argument("--sample-rate", type=int, default=10_000_000,
                     help="Saleae digital sample rate in S/s (default 10 MS/s)")
-    ap.add_argument("--csv-dir", default=os.path.join(os.path.dirname(__file__), "smoketest_csv"),
+    ap.add_argument("--csv-dir", default=os.path.join(os.path.dirname(os.path.dirname(__file__)), "smoketest_csv"),
                     help="directory for the exported digital.csv files")
     ap.add_argument("--device-id", default=None, help="Saleae device id (default: first found)")
     ap.add_argument("--automation-port", type=int, default=10430)
     ap.add_argument("--quiet-cli", action="store_true",
                     help="do not echo the serial commands/responses")
-    ap.add_argument("--report", default=os.path.join(os.path.dirname(__file__), "smoketest_report.html"),
+    ap.add_argument("--report", default=os.path.join(os.path.dirname(os.path.dirname(__file__)), "smoketest_report.html"),
                     help="output HTML report (PWM + half-bridge + plots)")
     ap.add_argument("--no-halfbridge", action="store_true",
                     help="skip the CLB half-bridge frequency/dead-time sweep")

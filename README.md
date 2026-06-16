@@ -8,7 +8,7 @@ A serial console runs over the on-board debugger's virtual COM port (PKOB nano C
 Type commands to show help, query the firmware build, reset the device, or
 configure and start/stop two hardware PWM channels with adjustable frequency and
 duty cycle. The project can be built and flashed entirely from the command line
-(`build.bat` + `flash.py`).
+(`build.bat` + `tools/flash.py`).
 
 > **Built with Claude Code.** The entire firmware and tooling in this repository
 > was generated with [Claude Code](https://www.anthropic.com/claude-code) — the
@@ -102,7 +102,7 @@ cd Loop_Check
 install.bat
 ```
 
-`install.bat` (a thin wrapper over `install.py`) does four things:
+`install.bat` (a thin wrapper over `tools/install.py`) does four things:
 
 1. `pip install -r requirements.txt` — `pyserial`, `numpy`, `matplotlib`,
    `logic2-automation`.
@@ -117,13 +117,13 @@ When it prints **Python packages: OK** and **Toolchain: OK**, you are ready:
 
 ```cmd
 build.bat
-python flash.py
-python run_ci.py
+python tools/flash.py
+python tools/run_ci.py
 ```
 
 `install.bat --no-setup` installs the packages and checks the toolchain only
 (skips the per-machine setup). The two helpers can also be run on their own —
-`python setup_compiler.py` and `python setup_flasher.py` (both support `--auto`).
+`python tools/setup_compiler.py` and `python tools/setup_flasher.py` (both support `--auto`).
 
 ## Serial console commands
 
@@ -323,8 +323,8 @@ build.bat              :: configure (if needed) and build  -> out\Loop\default.e
 build.bat rebuild      :: clean, then build
 build.bat clean        :: remove the build tree and output
 
-python flash.py        :: program out\Loop\default.hex via MPLAB MDB, then run
-python flash.py --list :: list detected debuggers (no programming)
+python tools/flash.py        :: program out\Loop\default.hex via MPLAB MDB, then run
+python tools/flash.py --list :: list detected debuggers (no programming)
 ```
 
 - `build.bat` drives the CMake preset and Ninja. It needs CMake and Ninja on
@@ -369,8 +369,8 @@ The reader thread also scrapes the `pulse status` / `clb status` lines, so the
 sliders, switches and labels track the device's real state.
 
 ```cmd
-python gui.py                 :: port auto-detected from setup_flasher.config
-python gui.py --port COM7     :: override the port
+python tools/gui.py                 :: port auto-detected from setup_flasher.config
+python tools/gui.py --port COM7     :: override the port
 ```
 
 `tkinter` ships with CPython; the only extra dependency is `pyserial`, already in
@@ -410,13 +410,13 @@ Setup:
 - `pip install logic2-automation pyserial matplotlib`
 
 ```
-python smoketest.py                        :: all three suites -> smoketest_report.html
-python smoketest.py --no-halfbridge        :: regression + PWM only
-python smoketest.py --no-regression --no-pwm :: half-bridge sweep only
-python smoketest.py --report out.html      :: choose the report path
-python smoketest.py --sample-rate 25000000 :: PWM-capture sample rate
-python smoketest.py --analyze smoketest_csv\test3 :: re-analyse an existing CSV (no HW)
-python smoketest.py --selftest             :: validate the analyser (no hardware)
+python tools/smoketest.py                        :: all three suites -> smoketest_report.html
+python tools/smoketest.py --no-halfbridge        :: regression + PWM only
+python tools/smoketest.py --no-regression --no-pwm :: half-bridge sweep only
+python tools/smoketest.py --report out.html      :: choose the report path
+python tools/smoketest.py --sample-rate 25000000 :: PWM-capture sample rate
+python tools/smoketest.py --analyze smoketest_csv\test3 :: re-analyse an existing CSV (no HW)
+python tools/smoketest.py --selftest             :: validate the analyser (no hardware)
 ```
 
 Captured raw data is kept under `smoketest_csv\` (e.g. `test<N>\digital.csv`,
@@ -437,10 +437,10 @@ divider). For every log-spaced requested frequency it sets `pulse freq`, records
 RC0, measures the real frequency from the capture and records it.
 
 ```
-python freq_sweep.py                       :: sweep on COM12, show the plot
-python freq_sweep.py --points 80 --fmax 100000
-python freq_sweep.py --sample-rate 25000000 --fmax 250000
-python freq_sweep.py --no-show             :: save PNG/CSV only
+python tools/freq_sweep.py                       :: sweep on COM12, show the plot
+python tools/freq_sweep.py --points 80 --fmax 100000
+python tools/freq_sweep.py --sample-rate 25000000 --fmax 250000
+python tools/freq_sweep.py --no-show             :: save PNG/CSV only
 ```
 
 It writes `freq_sweep.csv` (requested / firmware-reported / measured / deviation /
@@ -461,10 +461,10 @@ achievable resolution gets coarser as the frequency rises — the plot overlays 
 curves per frequency to show this.
 
 ```
-python duty_sweep.py                          :: default 1/10/50 kHz, show plot
-python duty_sweep.py --freqs 1000,20000,100000
-python duty_sweep.py --duty-step 2            :: finer duty sweep
-python duty_sweep.py --sample-rate 50000000   :: force a fixed rate instead of auto
+python tools/duty_sweep.py                          :: default 1/10/50 kHz, show plot
+python tools/duty_sweep.py --freqs 1000,20000,100000
+python tools/duty_sweep.py --duty-step 2            :: finer duty sweep
+python tools/duty_sweep.py --sample-rate 50000000   :: force a fixed rate instead of auto
 ```
 
 The Saleae's duty resolution is one sample per period (`frequency / sample_rate`),
@@ -493,7 +493,7 @@ logic analyzer needed), so it runs fast and catches firmware bugs early:
 - **Reset** — `reset` reboots the device and restores power-on defaults.
 
 ```
-python regression.py            :: run on COM12, write regression_report.html
+python tools/regression.py            :: run on COM12, write regression_report.html
 ```
 
 It writes its own `regression_report.html`. (These tests once caught a real
@@ -507,9 +507,9 @@ run covers CLI regression + PWM + half-bridge.
 `run_ci.py` ties the whole pipeline together and produces a single HTML protocol:
 
 ```
-python run_ci.py                 :: build -> flash -> regression + smoke -> report.html
-python run_ci.py --skip-build    :: use the existing binary
-python run_ci.py --skip-flash    :: test the firmware already on the target
+python tools/run_ci.py                 :: build -> flash -> regression + smoke -> report.html
+python tools/run_ci.py --skip-build    :: use the existing binary
+python tools/run_ci.py --skip-flash    :: test the firmware already on the target
 ```
 
 It runs, in order: **build** (`build.bat`), **flash** (`flash.py`/MDB),
@@ -540,24 +540,29 @@ free-running counter routes reliably.
 
 ## Project structure
 
+> All Python tooling lives in `tools/`. The firmware (`main.c`, `clbBitstream.S`,
+> `clb1_defs.h`), the build entry points (`build.bat`, `install.bat`) and the
+> per-machine `*.config` files stay in the repo root, where CMake and the scripts
+> expect them. Run the tools as `python tools/<name>.py`.
+
 | Path                    | Purpose                                                                                                                             |
 |-------------------------|-------------------------------------------------------------------------------------------------------------------------------------|
 | main.c                  | Application: UART console, command parser and hardware PWM control                                                                  |
-| install.bat / install.py| One-shot installer: pip deps + toolchain check + per-machine setup                                                                  |
+| install.bat / tools/install.py | One-shot installer: pip deps + toolchain check + per-machine setup                                                                  |
 | requirements.txt        | Python package list (pyserial, numpy, matplotlib, logic2-automation)                                                               |
-| setup_compiler.py       | Pick the XC8 version and patch `toolchain.cmake` (writes `setup_compiler.config`)                                                   |
-| setup_flasher.py        | Detect the Curiosity Nano COM port (writes `setup_flasher.config`)                                                                  |
-| project_config.py       | Reads `setup_flasher.config` for the tools' default `--port`                                                                        |
+| tools/setup_compiler.py       | Pick the XC8 version and patch `toolchain.cmake` (writes `setup_compiler.config`)                                                   |
+| tools/setup_flasher.py        | Detect the Curiosity Nano COM port (writes `setup_flasher.config`)                                                                  |
+| tools/project_config.py       | Reads `setup_flasher.config` for the tools' default `--port`                                                                        |
 | build.bat               | Command-line build wrapper (CMake preset + Ninja)                                                                                   |
-| flash.py                | Command-line flash tool driving the MPLAB MDB (programs over ICSP)                                                                  |
-| gui.py                  | Tkinter control panel: connect over serial and drive PWM + CLB half-bridge from sliders/buttons, with a live console + raw command line |
-| smoketest.py            | All-in-one HW test: CLI regression + PWM smoke + CLB half-bridge sweep → `smoketest_report.html` (with plots)                       |
-| clb_hb_report.py        | Stand-alone CLB half-bridge report (freq × dead-time sweep, plots) → `clb_hb_report.html`; its measurement/plot code is reused by smoketest |
-| freq_sweep.py           | Saleae-verified frequency sweep; plots deviation vs. requested (matplotlib)                                                         |
-| duty_sweep.py           | Saleae-verified duty-cycle sweep at several frequencies; plots deviation (matplotlib)                                               |
-| regression.py           | Serial-only regression suite (validation, line editor, RX stress, reset)                                                            |
-| run_ci.py               | One-command CI: build → flash → regression + smoke → `report.html`                                                                  |
-| testreport.py           | Shared result model + self-contained HTML report writer                                                                            |
+| tools/flash.py                | Command-line flash tool driving the MPLAB MDB (programs over ICSP)                                                                  |
+| tools/gui.py                  | Tkinter control panel: connect over serial and drive PWM + CLB half-bridge from sliders/buttons, with a live console + raw command line |
+| tools/smoketest.py            | All-in-one HW test: CLI regression + PWM smoke + CLB half-bridge sweep → `smoketest_report.html` (with plots)                       |
+| tools/clb_hb_report.py        | Stand-alone CLB half-bridge report (freq × dead-time sweep, plots) → `clb_hb_report.html`; its measurement/plot code is reused by smoketest |
+| tools/freq_sweep.py           | Saleae-verified frequency sweep; plots deviation vs. requested (matplotlib)                                                         |
+| tools/duty_sweep.py           | Saleae-verified duty-cycle sweep at several frequencies; plots deviation (matplotlib)                                               |
+| tools/regression.py           | Serial-only regression suite (validation, line editor, RX stress, reset)                                                            |
+| tools/run_ci.py               | One-command CI: build → flash → regression + smoke → `report.html`                                                                  |
+| tools/testreport.py           | Shared result model + self-contained HTML report writer                                                                            |
 | report.html             | Generated CI protocol (overall verdict + every check); `regression_report.html` likewise                                           |
 | loop_automation.pptx    | Slide deck presenting the automated build/flash/test workflow and the CLB half-bridge (see [Presentation](#presentation))           |
 | docs                    | Reference images (e.g. the Curiosity Nano pinout shown above)                                                                       |

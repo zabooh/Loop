@@ -174,16 +174,16 @@ RC2 carries the CLB-generated PWM (it loops back into TMR2's reset and the CLCs)
 python clb\synth.py
 
 :: build + flash the firmware
-build.bat  &  python flash.py
+build.bat  &  python tools/flash.py
 
 :: hardware test + reports
-python clb_halfbridge_test.py --csv-dir C:\work\Loop\clb_hb_csv   :: -> clb_halfbridge_report.html
-python clb_hil.py --skip-build                                    :: -> clb_hil_report.html
+python tools/clb_halfbridge_test.py --csv-dir C:\work\Loop\clb_hb_csv   :: -> clb_halfbridge_report.html
+python tools/clb_hil.py --skip-build                                    :: -> clb_hil_report.html
 python clb\plot_signals.py --dt 10                                :: -> clb/clb_signals.png, clb/clb_deadtime_zoom.png
 python clb\blockdiagram.py                                        :: -> clb/clb_blockdiagram.png
 
 :: manual probing (Saleae channels 0..3 = RC0..RC3)
-python clb_debug.py --cmds "clb dt 10;clb on" --channels 0,1,2 --sample-rate 100000000
+python tools/clb_debug.py --cmds "clb dt 10;clb on" --channels 0,1,2 --sample-rate 100000000
 ```
 
 ### Console commands
@@ -330,9 +330,9 @@ gates** and writes `clb_capability_report.html`, using **all four** Saleae chann
   on RC3; `clbsw <hex>` drives the 32-bit `CLBSWIN` software input).
 
 ```cmd
-python clb_analyze.py                 :: full run -> clb_capability_report.html
-python clb_analyze.py --gate-a-only   :: synthesis only, no hardware
-python clb_analyze.py --only counter_2tap,comb_basic
+python tools/clb_analyze.py                 :: full run -> clb_capability_report.html
+python tools/clb_analyze.py --gate-a-only   :: synthesis only, no hardware
+python tools/clb_analyze.py --only counter_2tap,comb_basic
 ```
 
 **Result (2026-06-15): WORKS = 1, ROUTE_FAIL = 5, HW_DEAD = 9.** The CLB reliably

@@ -42,7 +42,7 @@ def main():
     ap.add_argument("--port", default=project_config.flasher_port())
     ap.add_argument("--automation-port", type=int, default=10430)
     ap.add_argument("--device-id", default=None)
-    ap.add_argument("--out", default=os.path.join(os.path.dirname(__file__), "clb_debug_csv"))
+    ap.add_argument("--out", default=os.path.join(os.path.dirname(os.path.dirname(__file__)), "clb_debug_csv"))
     args = ap.parse_args()
 
     channels = [int(c) for c in args.channels.split(",") if c.strip() != ""]

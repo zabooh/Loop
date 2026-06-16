@@ -33,7 +33,7 @@ from run_ci import run_build, run_flash
 from smoketest import Console, saleae_capture, analyze_digital_csv
 from testreport import Suite, Result, Check, write_html
 
-ROOT = os.path.dirname(os.path.abspath(__file__))
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SYNTH = os.path.join(ROOT, "clb", "synth.py")
 CATALOG_DIR = os.path.join(ROOT, "clb", "catalog")
 BITSTREAM = os.path.join(ROOT, "clbBitstream.S")

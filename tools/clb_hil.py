@@ -41,7 +41,7 @@ import project_config
 from run_ci import run_build, run_flash
 import clb_halfbridge_test as hbtest
 
-ROOT = os.path.dirname(os.path.abspath(__file__))
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SYNTH = os.path.join(ROOT, "clb", "synth.py")
 LOG_PATH = os.path.join(ROOT, "clb_hil.log")
 

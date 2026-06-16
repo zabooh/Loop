@@ -276,7 +276,7 @@ def main():
     ap.add_argument("--port", default=project_config.flasher_port())
     ap.add_argument("--sample-rate", type=int, default=DEFAULT_RATE)
     ap.add_argument("--freq", type=int, default=DEFAULT_FREQ, help="PWM input frequency (Hz)")
-    ap.add_argument("--csv-dir", default=os.path.join(os.path.dirname(__file__), "clb_hb_csv"))
+    ap.add_argument("--csv-dir", default=os.path.join(os.path.dirname(os.path.dirname(__file__)), "clb_hb_csv"))
     ap.add_argument("--device-id", default=None)
     ap.add_argument("--automation-port", type=int, default=10430)
     ap.add_argument("--quiet-cli", action="store_true")

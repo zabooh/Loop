@@ -182,7 +182,7 @@ def run(console) -> Suite:
 
 
 def main():
-    here = os.path.dirname(os.path.abspath(__file__))
+    here = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     ap = argparse.ArgumentParser(description="Serial-only firmware regression tests")
     ap.add_argument("--port", default=project_config.flasher_port())
     ap.add_argument("--out", default=os.path.join(here, "regression_report.html"))

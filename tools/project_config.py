@@ -9,7 +9,7 @@ command-line arguments. Falls back to COM12 if the config is absent.
 import json
 import os
 
-_HERE = os.path.dirname(os.path.abspath(__file__))
+_HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 FLASHER_CONFIG = os.path.join(_HERE, "setup_flasher.config")
 
 
